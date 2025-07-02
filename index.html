@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Essay Grader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" xintegrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoVBL5gI9kLmbG0CsdC3EokL/OrY4A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" xintegrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #1e293b;
+        }
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+        .btn-danger {
+            background-color: #dc2626;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
+        .loader {
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #promptAnalysisModal, #loadingModal, #confirmModal {
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="antialiased text-slate-800">
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-slate-900">AI Essay Grader</h1>
+            <p class="text-lg text-slate-600 mt-2">Improve your English writing skills with AI-powered feedback.</p>
+        </header>
+
+        <main class="space-y-8">
+            <!-- Step 1: Setup -->
+            <section id="setupSection" class="card">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2 text-slate-700">Step 1: Essay Setup</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="essayPrompt" class="block text-sm font-medium text-slate-700 mb-1">Enter your essay prompt</label>
+                        <textarea id="essayPrompt" rows="3" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                        <button id="analyzePromptBtn" class="btn btn-secondary w-full sm:w-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                            Analyze Prompt
+                        </button>
+                        <div class="flex items-center space-x-2">
+                            <label for="timeLimit" class="text-sm font-medium text-slate-700">Writing Time:</label>
+                            <select id="timeLimit" class="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="15">15 minutes</option>
+                                <option value="30">30 minutes</option>
+                                <option value="45" selected>45 minutes</option>
+                                <option value="60">60 minutes</option>
+                                <option value="90">90 minutes</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                 <div class="mt-6 text-center">
+                    <button id="startWritingBtn" class="btn btn-primary w-full md:w-1/2">Start Writing Session</button>
+                </div>
+            </section>
+
+            <!-- Step 2: Writing -->
+            <section id="writingSection" class="card hidden">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-2xl font-bold text-slate-700">Step 2: Write Your Essay</h2>
+                    <div id="timerDisplay" class="text-2xl font-bold text-blue-700">--:--</div>
+                </div>
+                <div>
+                    <textarea id="userEssay" rows="15" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Start writing your essay here..."></textarea>
+                </div>
+                <div class="mt-4 text-center">
+                    <button id="submitBtn" class="btn btn-danger w-full md:w-1/2">Submit for Grading</button>
+                </div>
+            </section>
+
+            <!-- Step 3: Results -->
+            <section id="resultsSection" class="card hidden">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b pb-2 gap-4">
+                    <h2 class="text-2xl font-bold text-slate-700">Step 3: Results & Analysis</h2>
+                    <div class="flex space-x-2">
+                         <button id="downloadReportBtn" class="btn btn-secondary">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            Download PDF Report
+                        </button>
+                        <button id="startNewBtn" class="btn btn-primary">Start New Essay</button>
+                    </div>
+                </div>
+                <div id="resultsContent" class="space-y-6">
+                    <!-- Results will be injected here by JavaScript -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Prompt Analysis Modal -->
+    <div id="promptAnalysisModal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50">
+        <div class="modal-content card max-w-2xl w-11/12 bg-white">
+            <h3 class="text-xl font-bold mb-4">Prompt Analysis</h3>
+            <div id="promptAnalysisContent" class="prose max-w-none"></div>
+            <button onclick="document.getElementById('promptAnalysisModal').classList.add('hidden')" class="btn btn-primary mt-4">Got it</button>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 w-full h-full flex flex-col items-center justify-center hidden z-50">
+        <div class="loader"></div>
+        <p id="loadingText" class="text-white text-lg mt-4">AI is working, please wait...</p>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50">
+        <div class="modal-content card max-w-md w-11/12 bg-white">
+            <h3 class="text-xl font-bold mb-4">Confirm Action</h3>
+            <p>Are you sure you want to start a new essay? The current report will be cleared.</p>
+            <div class="flex justify-end space-x-4 mt-6">
+                <button id="confirmCancelBtn" class="btn btn-secondary">Cancel</button>
+                <button id="confirmOkBtn" class="btn btn-danger">Yes, Start New</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const setupSection = document.getElementById('setupSection');
+            const writingSection = document.getElementById('writingSection');
+            const resultsSection = document.getElementById('resultsSection');
+
+            const essayPromptEl = document.getElementById('essayPrompt');
+            const analyzePromptBtn = document.getElementById('analyzePromptBtn');
+            const timeLimitEl = document.getElementById('timeLimit');
+            const startWritingBtn = document.getElementById('startWritingBtn');
+            
+            const timerDisplay = document.getElementById('timerDisplay');
+            const userEssayEl = document.getElementById('userEssay');
+            const submitBtn = document.getElementById('submitBtn');
+
+            const resultsContent = document.getElementById('resultsContent');
+            const downloadReportBtn = document.getElementById('downloadReportBtn');
+            const startNewBtn = document.getElementById('startNewBtn');
+            
+            const loadingModal = document.getElementById('loadingModal');
+            const loadingText = document.getElementById('loadingText');
+            const promptAnalysisModal = document.getElementById('promptAnalysisModal');
+            const promptAnalysisContent = document.getElementById('promptAnalysisContent');
+            
+            // FIX: Get confirmation modal elements
+            const confirmModal = document.getElementById('confirmModal');
+            const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+            const confirmOkBtn = document.getElementById('confirmOkBtn');
+
+            // App State
+            let timerInterval = null;
+            let timeLeft = 0;
+            let analysisResult = null;
+
+            // --- Helper Function ---
+            function markdownToHtml(text) {
+                if (!text) return '';
+                return text
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+            }
+
+            // --- API Call Function ---
+            async function callApi(promptText, isJson = false) {
+                loadingModal.classList.remove('hidden');
+                const apiKey = "AIzaSyBEwNI0lgpvk_eSt_XZFjU1bSSPykAyceA";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: promptText }] }],
+                };
+
+                if (isJson) {
+                    payload.generationConfig = {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                overallScore: { type: "NUMBER", description: "Overall score out of 100" },
+                                generalFeedback: { type: "STRING", description: "General feedback on strengths and weaknesses." },
+                                structureAnalysis: { type: "STRING", description: "Analysis of the essay structure (intro, body, conclusion)." },
+                                sentenceCorrections: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            original: { type: "STRING" },
+                                            corrected: { type: "STRING" },
+                                            explanation: { type: "STRING" }
+                                        },
+                                        required: ["original", "corrected", "explanation"]
+                                    }
+                                }
+                            },
+                            required: ["overallScore", "generalFeedback", "structureAnalysis", "sentenceCorrections"]
+                        }
+                    };
+                }
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        let errorDetails = `Status: ${response.status}.`;
+                        try {
+                            const errorData = await response.json();
+                            errorDetails += ` Message: ${errorData.error.message}`;
+                        } catch (e) { /* Could not parse error response */ }
+                        throw new Error(`API request failed. ${errorDetails}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (!result.candidates || result.candidates.length === 0) {
+                        const blockReason = result.promptFeedback?.blockReason;
+                        if (blockReason) {
+                            throw new Error(`Request was blocked by the API for safety reasons: ${blockReason}.`);
+                        }
+                        throw new Error("API returned no candidates in the response.");
+                    }
+                    
+                    if (result.candidates[0]?.content?.parts?.[0]) {
+                        return result.candidates[0].content.parts[0].text;
+                    }
+
+                    throw new Error("Invalid API response structure.");
+
+                } catch (error) {
+                    console.error("Error calling API:", error);
+                    alert(`An error occurred while communicating with the AI: ${error.message}\nPlease check your API Key and network connection, then try again.`);
+                    return null;
+                } finally {
+                    loadingModal.classList.add('hidden');
+                }
+            }
+
+            // --- Event Listeners ---
+
+            analyzePromptBtn.addEventListener('click', async () => {
+                const promptText = essayPromptEl.value.trim();
+                if (!promptText) {
+                    alert("Please enter a prompt to analyze.");
+                    return;
+                }
+                loadingText.textContent = "AI is analyzing the prompt...";
+                const apiPrompt = `Analyze the following English essay prompt for a non-native student. Provide a breakdown of key requirements, a suggested essay structure, and a list of useful vocabulary. Do not repeat the prompt itself in your output. Just provide the analysis.\n\nPrompt: "${promptText}"`;
+                const analysis = await callApi(apiPrompt);
+                if (analysis) {
+                    promptAnalysisContent.innerHTML = markdownToHtml(analysis);
+                    promptAnalysisModal.classList.remove('hidden');
+                }
+            });
+            
+            startWritingBtn.addEventListener('click', () => {
+                if (!essayPromptEl.value.trim()) {
+                    alert("Please enter an essay prompt before starting.");
+                    return;
+                }
+                setupSection.classList.add('hidden');
+                writingSection.classList.remove('hidden');
+                userEssayEl.focus();
+                startTimer();
+            });
+
+            submitBtn.addEventListener('click', () => {
+                submitEssay();
+            });
+            
+            // FIX: Replace confirm() with custom modal
+            startNewBtn.addEventListener('click', () => {
+                confirmModal.classList.remove('hidden');
+            });
+
+            confirmCancelBtn.addEventListener('click', () => {
+                confirmModal.classList.add('hidden');
+            });
+
+            confirmOkBtn.addEventListener('click', () => {
+                localStorage.removeItem('essayGraderData');
+                window.location.reload();
+            });
+
+
+            downloadReportBtn.addEventListener('click', () => {
+                if (!analysisResult) {
+                    alert("No report available to download.");
+                    return;
+                }
+
+                loadingText.textContent = "Generating PDF report...";
+                loadingModal.classList.remove('hidden');
+
+                const { jsPDF } = window.jspdf;
+                const reportElement = document.getElementById('resultsContent');
+                const originalBackgroundColor = reportElement.style.backgroundColor;
+                reportElement.style.backgroundColor = 'white';
+
+                html2canvas(reportElement, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                }).then(canvas => {
+                    reportElement.style.backgroundColor = originalBackgroundColor;
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'px',
+                        format: [canvas.width, canvas.height]
+                    });
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                    pdf.save('essay-analysis-report.pdf');
+                    
+                    loadingModal.classList.add('hidden');
+
+                }).catch(err => {
+                    reportElement.style.backgroundColor = originalBackgroundColor;
+                    console.error("Error generating PDF:", err);
+                    alert("Sorry, there was an error creating the PDF report.");
+                    loadingModal.classList.add('hidden');
+                });
+            });
+
+            // --- Core Logic Functions ---
+
+            function startTimer() {
+                timeLeft = parseInt(timeLimitEl.value) * 60;
+                updateTimerDisplay();
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    updateTimerDisplay();
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        alert("Time's up! Your essay will be submitted automatically.");
+                        submitEssay();
+                    }
+                }, 1000);
+            }
+
+            function updateTimerDisplay() {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            async function submitEssay() {
+                clearInterval(timerInterval);
+                const essayText = userEssayEl.value.trim();
+                const promptText = essayPromptEl.value.trim();
+
+                if (essayText.length < 20) {
+                    alert("Your essay is too short to be graded. Please write more.");
+                    startTimer();
+                    return;
+                }
+
+                loadingText.textContent = "AI is grading your essay...";
+                const apiPrompt = `You are an expert English teacher grading an essay from a non-native student.
+                - Essay Prompt: "${promptText}"
+                - Student's Essay: "${essayText}"
+                
+                Please provide a detailed analysis based on the provided JSON schema. Be encouraging but clear in your feedback. The score should reflect the quality of a non-native high school student's writing. Provide corrections for every sentence that has an error. If a sentence is perfect, state that.
+                `;
+
+                const resultText = await callApi(apiPrompt, true);
+                
+                if (resultText) {
+                    try {
+                        analysisResult = JSON.parse(resultText);
+                        renderResults(analysisResult);
+                        saveToLocalStorage(analysisResult);
+                        writingSection.classList.add('hidden');
+                        resultsSection.classList.remove('hidden');
+                    } catch (e) {
+                        console.error("JSON parsing error:", e);
+                        alert("The AI returned an invalid response. Please try submitting again.");
+                    }
+                }
+            }
+            
+            function renderResults(data) {
+                const { overallScore, generalFeedback, structureAnalysis, sentenceCorrections } = data;
+                
+                let html = `
+                    <div class="text-center mb-6">
+                        <p class="text-lg text-slate-600">Overall Score</p>
+                        <p class="text-6xl font-bold text-blue-800">${overallScore}<span class="text-2xl text-slate-500">/100</span></p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-bold text-lg text-slate-800">General Feedback</h4>
+                            <p class="text-slate-700">${markdownToHtml(generalFeedback)}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg text-slate-800">Structure Analysis</h4>
+                            <p class="text-slate-700">${markdownToHtml(structureAnalysis)}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg text-slate-800">Detailed Corrections & Analysis</h4>
+                            <div class="space-y-3 mt-2">
+                `;
+
+                sentenceCorrections.forEach(item => {
+                    html += `
+                        <div class="p-3 border rounded-lg bg-slate-50">
+                            <p class="text-sm text-slate-500">Original:</p>
+                            <p class="italic text-slate-800">"${item.original}"</p>
+                            <p class="text-sm text-green-600 mt-2">Corrected:</p>
+                            <p class="font-semibold text-green-700">"${item.corrected}"</p>
+                            <p class="text-sm text-blue-600 mt-2">Explanation:</p>
+                            <p class="text-blue-800">${markdownToHtml(item.explanation)}</p>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div></div>`;
+                resultsContent.innerHTML = html;
+            }
+
+            // --- Local Storage ---
+            function saveToLocalStorage(data) {
+                const saveData = {
+                    prompt: essayPromptEl.value,
+                    essay: userEssayEl.value,
+                    analysis: data,
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('essayGraderData', JSON.stringify(saveData));
+            }
+
+            function loadFromLocalStorage() {
+                const savedData = localStorage.getItem('essayGraderData');
+                if (savedData) {
+                    const { prompt, essay, analysis } = JSON.parse(savedData);
+                    essayPromptEl.value = prompt;
+                    userEssayEl.value = essay;
+                    analysisResult = analysis;
+                    renderResults(analysis);
+                    setupSection.classList.add('hidden');
+                    resultsSection.classList.remove('hidden');
+                }
+            }
+
+            // Initial Load
+            loadFromLocalStorage();
+        });
+    </script>
+</body>
+</html>
