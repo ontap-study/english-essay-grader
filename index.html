@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Essay Grader</title>
+    <title>AI Essay Grader V2.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,18 +81,38 @@
     <!-- Main Container -->
     <div class="container mx-auto p-4 md:p-8 max-w-5xl">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-slate-900">AI Essay Grader</h1>
-            <p class="text-lg text-slate-600 mt-2">Improve your English writing skills with AI-powered feedback.</p>
+            <h1 class="text-4xl font-bold text-slate-900">AI Essay Grader <span class="text-2xl text-blue-600">V2.1</span></h1>
+            <p class="text-lg text-slate-600 mt-2">Generate prompts and get AI-powered feedback to improve your writing.</p>
         </header>
 
         <main class="space-y-8">
             <!-- Step 1: Setup -->
             <section id="setupSection" class="card">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2 text-slate-700">Step 1: Essay Setup</h2>
+                <h2 class="text-2xl font-bold mb-6 border-b pb-2 text-slate-700">Step 1: Essay Setup</h2>
+                
+                <div class="p-4 border border-blue-200 bg-blue-50 rounded-lg mb-6">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">Generate a Topic</h3>
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <div class="flex-grow w-full">
+                            <label for="difficultyLevel" class="sr-only">Difficulty Level</label>
+                            <select id="difficultyLevel" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="Beginner (CEFR A2/B1)">Beginner (CEFR A2/B1)</option>
+                                <option value="Intermediate (CEFR B2)">Intermediate (CEFR B2)</option>
+                                <option value="Advanced (CEFR C1)">Advanced (CEFR C1)</option>
+                                <option value="IELTS Task 2">IELTS Task 2</option>
+                            </select>
+                        </div>
+                        <button id="generatePromptBtn" class="btn btn-secondary w-full sm:w-auto flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                            Generate
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="space-y-4">
                     <div>
-                        <label for="essayPrompt" class="block text-sm font-medium text-slate-700 mb-1">Enter your essay prompt</label>
-                        <textarea id="essayPrompt" rows="3" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                        <label for="essayPrompt" class="block text-sm font-medium text-slate-700 mb-1">Or enter your own essay prompt</label>
+                        <textarea id="essayPrompt" rows="3" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="An essay prompt will be generated here, or you can type your own."></textarea>
                     </div>
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                         <button id="analyzePromptBtn" class="btn btn-secondary w-full sm:w-auto">
@@ -149,7 +169,7 @@
         </main>
     </div>
 
-    <!-- Prompt Analysis Modal -->
+    <!-- Modals -->
     <div id="promptAnalysisModal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50">
         <div class="modal-content card max-w-2xl w-11/12 bg-white">
             <h3 class="text-xl font-bold mb-4">Prompt Analysis</h3>
@@ -158,13 +178,11 @@
         </div>
     </div>
 
-    <!-- Loading Modal -->
     <div id="loadingModal" class="fixed inset-0 w-full h-full flex flex-col items-center justify-center hidden z-50">
         <div class="loader"></div>
         <p id="loadingText" class="text-white text-lg mt-4">AI is working, please wait...</p>
     </div>
 
-    <!-- Confirmation Modal -->
     <div id="confirmModal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50">
         <div class="modal-content card max-w-md w-11/12 bg-white">
             <h3 class="text-xl font-bold mb-4">Confirm Action</h3>
@@ -184,6 +202,8 @@
             const writingSection = document.getElementById('writingSection');
             const resultsSection = document.getElementById('resultsSection');
 
+            const difficultyLevelEl = document.getElementById('difficultyLevel');
+            const generatePromptBtn = document.getElementById('generatePromptBtn');
             const essayPromptEl = document.getElementById('essayPrompt');
             const analyzePromptBtn = document.getElementById('analyzePromptBtn');
             const timeLimitEl = document.getElementById('timeLimit');
@@ -202,7 +222,6 @@
             const promptAnalysisModal = document.getElementById('promptAnalysisModal');
             const promptAnalysisContent = document.getElementById('promptAnalysisContent');
             
-            // FIX: Get confirmation modal elements
             const confirmModal = document.getElementById('confirmModal');
             const confirmCancelBtn = document.getElementById('confirmCancelBtn');
             const confirmOkBtn = document.getElementById('confirmOkBtn');
@@ -231,14 +250,18 @@
                 };
 
                 if (isJson) {
+                    // FIX: Improved schema description for more accurate scoring.
                     payload.generationConfig = {
                         responseMimeType: "application/json",
                         responseSchema: {
                             type: "OBJECT",
                             properties: {
-                                overallScore: { type: "NUMBER", description: "Overall score out of 100" },
-                                generalFeedback: { type: "STRING", description: "General feedback on strengths and weaknesses." },
-                                structureAnalysis: { type: "STRING", description: "Analysis of the essay structure (intro, body, conclusion)." },
+                                overallScore: { 
+                                    type: "NUMBER",
+                                    description: "A fair and holistic score from 0 to 100, reflecting the essay's quality based on academic criteria (Task Response, Coherence, Vocabulary, Grammar). The score must be an integer."
+                                },
+                                generalFeedback: { type: "STRING" },
+                                structureAnalysis: { type: "STRING" },
                                 sentenceCorrections: {
                                     type: "ARRAY",
                                     items: {
@@ -300,10 +323,20 @@
 
             // --- Event Listeners ---
 
+            generatePromptBtn.addEventListener('click', async () => {
+                loadingText.textContent = "Generating a new prompt...";
+                const level = difficultyLevelEl.value;
+                const apiPrompt = `Generate one academic English essay prompt suitable for a student at the ${level} level. The topic should be common for exams (e.g., technology, environment, education, society). Output only the prompt text itself, without any extra text or labels like "Prompt:".`;
+                const newPrompt = await callApi(apiPrompt);
+                if (newPrompt) {
+                    essayPromptEl.value = newPrompt.trim();
+                }
+            });
+
             analyzePromptBtn.addEventListener('click', async () => {
                 const promptText = essayPromptEl.value.trim();
                 if (!promptText) {
-                    alert("Please enter a prompt to analyze.");
+                    alert("Please generate or enter a prompt to analyze.");
                     return;
                 }
                 loadingText.textContent = "AI is analyzing the prompt...";
@@ -317,7 +350,7 @@
             
             startWritingBtn.addEventListener('click', () => {
                 if (!essayPromptEl.value.trim()) {
-                    alert("Please enter an essay prompt before starting.");
+                    alert("Please generate or enter an essay prompt before starting.");
                     return;
                 }
                 setupSection.classList.add('hidden');
@@ -330,7 +363,6 @@
                 submitEssay();
             });
             
-            // FIX: Replace confirm() with custom modal
             startNewBtn.addEventListener('click', () => {
                 confirmModal.classList.remove('hidden');
             });
@@ -343,7 +375,6 @@
                 localStorage.removeItem('essayGraderData');
                 window.location.reload();
             });
-
 
             downloadReportBtn.addEventListener('click', () => {
                 if (!analysisResult) {
@@ -419,11 +450,19 @@
                 }
 
                 loadingText.textContent = "AI is grading your essay...";
-                const apiPrompt = `You are an expert English teacher grading an essay from a non-native student.
-                - Essay Prompt: "${promptText}"
-                - Student's Essay: "${essayText}"
+                // FIX: Improved prompt for more accurate grading.
+                const apiPrompt = `As an expert English teacher, carefully evaluate the following essay written by a non-native student. Provide a fair and accurate analysis based on the provided JSON schema.
                 
-                Please provide a detailed analysis based on the provided JSON schema. Be encouraging but clear in your feedback. The score should reflect the quality of a non-native high school student's writing. Provide corrections for every sentence that has an error. If a sentence is perfect, state that.
+                **Evaluation Criteria:**
+                1.  **Task Response:** How well does the essay address the prompt?
+                2.  **Coherence and Cohesion:** Is the essay well-structured and easy to follow?
+                3.  **Lexical Resource:** How effective is the vocabulary usage?
+                4.  **Grammatical Range and Accuracy:** How accurate and varied is the grammar?
+
+                **Essay Prompt:** "${promptText}"
+                **Student's Essay:** "${essayText}"
+                
+                Your response must be a JSON object matching the required schema. The 'overallScore' should be a realistic integer based on the criteria above.
                 `;
 
                 const resultText = await callApi(apiPrompt, true);
